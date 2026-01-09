@@ -1,6 +1,8 @@
+export const dynamic = "force-dynamic";
+
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -17,7 +19,32 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+/**
+ * ✅ Page本体は Suspense でラップするだけ
+ *   （useSearchParamsは Suspense の内側で呼ぶ必要がある）
+ */
 export default function StudyPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <StudyInner />
+    </Suspense>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      <div className="mx-auto max-w-4xl px-4 py-10 text-center">
+        <div className="rounded-3xl border bg-white p-8 shadow-sm">
+          <div className="text-2xl font-bold">読み込み中…</div>
+          <div className="mt-2 text-sm text-slate-600">少し待ってね</div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function StudyInner() {
   const params = useSearchParams();
 
   // URLパラメータ
@@ -41,7 +68,7 @@ export default function StudyPage() {
   // セッションID
   const [sessionId] = useState(() => crypto.randomUUID());
 
-  // ★ 自動で次へ進む時間：正解0.9秒／誤答0.7秒
+  // 自動で次へ進む時間：正解0.9秒／誤答0.7秒
   const AUTO_NEXT_CORRECT_MS = 900;
   const AUTO_NEXT_WRONG_MS = 700;
 
@@ -142,7 +169,7 @@ export default function StudyPage() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
 
-  // ★ 誤答時に正解を強調するためのフラグ
+  // 誤答時に正解を強調するフラグ
   const [showCorrectHint, setShowCorrectHint] = useState(false);
 
   // アニメ用
@@ -338,7 +365,6 @@ export default function StudyPage() {
     }
   };
 
-  // ★ 回答→演出→（正解0.9/誤答0.7）秒後に自動で次へ
   const choose = async (choice: string) => {
     if (selected) return;
 
@@ -349,10 +375,9 @@ export default function StudyPage() {
     setSelected(choice);
 
     const correct = choice === item.answer;
-    setShowCorrectHint(!correct); // ③ 誤答時だけ正解を強調
+    setShowCorrectHint(!correct); // 誤答時だけ正解強調
     fireFx(correct ? "correct" : "wrong");
 
-    // 保存は非同期
     saveAttempt(snapshot);
 
     const waitMs = correct ? AUTO_NEXT_CORRECT_MS : AUTO_NEXT_WRONG_MS;
@@ -374,7 +399,6 @@ export default function StudyPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* アニメ用CSS（追加ファイル不要） */}
       <style jsx global>{`
         @keyframes pop {
           0% { transform: scale(1); }
@@ -394,7 +418,6 @@ export default function StudyPage() {
       `}</style>
 
       <div className="mx-auto max-w-4xl px-4 py-6">
-        {/* Top bar */}
         <header className="mb-4 flex flex-col gap-3 rounded-3xl border bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -445,7 +468,6 @@ export default function StudyPage() {
             </div>
           </div>
 
-          {/* progress */}
           <div className="flex items-center justify-between gap-3 text-xs text-slate-600">
             <span>
               {index + 1} / {total}（{progressPct}%）
@@ -458,7 +480,6 @@ export default function StudyPage() {
             <div className="h-full rounded-full bg-slate-900" style={{ width: `${progressPct}%` }} />
           </div>
 
-          {/* flash controls */}
           {mode === "flash" && (
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <button
@@ -471,7 +492,6 @@ export default function StudyPage() {
               <button
                 onClick={() => setStage((s) => (s === 0 ? 1 : s === 1 ? 2 : 2))}
                 className="rounded-2xl border bg-white px-3 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50"
-                title="EnterでもOK"
               >
                 ＋表示（意味/例）
               </button>
@@ -509,29 +529,18 @@ export default function StudyPage() {
                   />
                 </div>
               </div>
-
-              <div className="w-full text-xs text-slate-500">
-                ショートカット：<span className="font-medium">Space</span>=再生/停止　
-                <span className="font-medium">←→</span>=前/次　
-                <span className="font-medium">Enter</span>=表示を進める
-              </div>
             </div>
           )}
         </header>
 
-        {/* Card */}
         <section className={["rounded-3xl border bg-white p-6 shadow-sm transition", fxCard].join(" ")}>
           <div className="text-sm text-slate-600 text-center">
-            {mode === "flash"
-              ? "フラッシュ表示"
-              : "4択テスト（正解→0.9秒／誤答→0.7秒で自動で次へ）"}
+            {mode === "flash" ? "フラッシュ表示" : "4択テスト（正解→0.9秒／誤答→0.7秒で自動で次へ）"}
           </div>
 
           <div className="mt-6">
-            {/* ① 語彙は中央寄せ */}
             <div className="text-center text-5xl font-extrabold tracking-tight text-slate-900">{item.word}</div>
 
-            {/* FLASH */}
             {mode === "flash" && (
               <div className="mt-5 space-y-3">
                 <div className={["rounded-2xl border p-4 text-lg text-center", stage >= 1 ? "bg-slate-50" : "bg-white"].join(" ")}>
@@ -547,17 +556,11 @@ export default function StudyPage() {
                     {stage >= 2 ? item.example : "（もう一度Enterで表示）"}
                   </div>
                 </div>
-
-                <div className="mt-4 rounded-2xl border bg-amber-50 p-4 text-sm text-amber-900 text-center">
-                  ここはフラッシュです（保存しません）。テストモードにすると回答ログが保存されます。
-                </div>
               </div>
             )}
 
-            {/* TEST */}
             {mode === "test" && (
               <div className="mt-6">
-                {/* ① ヒントも中央寄せ */}
                 <div className="rounded-2xl border bg-slate-50 p-4 text-center">
                   <div className="text-sm text-slate-600">意味（ヒント）</div>
                   <div className="mt-1 text-lg font-semibold text-slate-900">{item.definition}</div>
@@ -573,9 +576,7 @@ export default function StudyPage() {
                     const correctChoice = selected && isCorrectAnswer;
                     const wrongChoice = selected && chosen && !isCorrectAnswer;
 
-                    // ③ 誤答時だけ、正解選択肢を「強調」する（ハイライト＆リング＆少し大きく）
-                    const emphasizeCorrectOnWrong =
-                      selected && showCorrectHint && isCorrectAnswer;
+                    const emphasizeCorrectOnWrong = selected && showCorrectHint && isCorrectAnswer;
 
                     return (
                       <button
@@ -583,28 +584,17 @@ export default function StudyPage() {
                         onClick={() => choose(c)}
                         disabled={selected !== null}
                         className={[
-                          // ① 選択肢は中央寄せ
                           "w-full rounded-2xl border px-4 py-4 text-center text-base font-semibold shadow-sm transition",
                           "hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
                           "disabled:cursor-not-allowed disabled:opacity-95",
-
-                          // 通常色
                           !selected ? "bg-white" : "",
-
-                          // 正誤の色
                           correctChoice ? "border-emerald-300 bg-emerald-50" : "",
                           wrongChoice ? "border-rose-300 bg-rose-50" : "",
-
-                          // ③ 誤答時の「正解強調」
-                          emphasizeCorrectOnWrong
-                            ? "ring-2 ring-emerald-400 bg-emerald-50 scale-[1.01]"
-                            : "",
+                          emphasizeCorrectOnWrong ? "ring-2 ring-emerald-400 bg-emerald-50 scale-[1.01]" : "",
                         ].join(" ")}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <span>{c}</span>
-
-                          {/* 正解/不正解の記号も中央寄せで横に */}
                           {selected && (
                             <span className="text-sm">
                               {correctChoice ? "✅" : wrongChoice ? "❌" : emphasizeCorrectOnWrong ? "⭐" : ""}
@@ -616,14 +606,11 @@ export default function StudyPage() {
                   })}
                 </div>
 
-                {/* （表示は最小限） */}
                 {selected && (
                   <div className="mt-4 text-center text-sm text-slate-600">
                     {saveStatus === "saving" && "記録中…"}
                     {saveStatus === "saved" && "✅ 記録しました"}
-                    {saveStatus === "error" && (
-                      <span className="text-rose-700 break-all">❌ 保存エラー：{saveError}</span>
-                    )}
+                    {saveStatus === "error" && <span className="text-rose-700 break-all">❌ 保存エラー：{saveError}</span>}
                   </div>
                 )}
               </div>
