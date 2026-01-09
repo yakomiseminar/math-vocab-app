@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB8SVOSNaMDGRHJ3Iz3J1BOslnKGxrfqEQ",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: "math-vocab-log.firebaseapp.com",
   projectId: "math-vocab-log",
   storageBucket: "math-vocab-log.firebasestorage.app",
